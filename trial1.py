@@ -1,26 +1,23 @@
-import datetime
-import os
-import unittest
+import unittest, os
 from collections import defaultdict
 from prettytable import PrettyTable
-import unittest
 
-def file_reader(path, num_fields, seperator=',', header=False):
-    '''Read file'''
-    a = open(path, 'r')
-    with a:
-        for i, line in enumerate(a):
-            line_split = line.rstrip("\n")
-            line_split = line_split.split(seperator)
-            if len(line_split) != num_fields:
-                raise ValueError(f"{path} line: {i+1}: read {len(line_split)} fields but expected {num_fields}")
-            if header and i == 0 :
-                continue
-            yield tuple(line_split)
+def file_reader(path, num_fields, sep=",", header=False):
+    try:
+        fp = open(path, "r")
+    except FileNotFoundError:
+        print("Can't open", path)
+    else:
+        with fp:
+            for index, line in enumerate(fp):
+                line_split = line.strip().split(sep)
+                if len(line_split) != num_fields:
+                    raise ValueError(f"{path} line: {index+1}: read {len(line_split)} fields but expected {num_fields}")
+                if index == 0 and header:
+                    continue   
+                yield tuple(line_split)
 
-
-class Repository():
-
+class Repository:
     def __init__(self, dir):
         self.students = dict()
         self.instructors = dict()
@@ -29,7 +26,7 @@ class Repository():
         self.add_instructors(os.path.join(dir, "instructors.txt"))
         self.add_grades(os.path.join(dir, "grades.txt"))
         self.add_major(os.path.join(dir, "majors.txt"))
-        self.add_courses()
+        self.remaining_courses()
         self.major_pt()
         self.student_pt()
         self.instructor_pt()
@@ -38,32 +35,30 @@ class Repository():
         for s_cwid, s_name, major in file_reader(students_file_path, 3, "\t"):
             if s_cwid not in self.students:
                 self.students[s_cwid] = Student(s_cwid, s_name, major)
-
+    
     def add_instructors(self, instructor_file_path):
-        for i_cwid, i_name, department in file_reader(instructor_file_path, 3, "\t"):
+        for i_cwid, i_name, dept in file_reader(instructor_file_path, 3, "\t"):
             if i_cwid not in self.instructors:
-                self.instructors[i_cwid] = Instructor(i_cwid, i_name, department)
+                self.instructors[i_cwid] = Instructor(i_cwid, i_name, dept)
 
     def add_grades(self, grades_file_path):
         for s_cwid, course, grade, i_cwid in file_reader(grades_file_path, 4, "\t"):
             self.students[s_cwid].add_course(course, grade)
             self.instructors[i_cwid].add_course(course)
-
+     
     def add_major(self, major_file_path):
-        for dept, rore, course in file_reader(major_file_path, 3, "\t"):
+        for dept, r_or_e, course in file_reader(major_file_path, 3, "\t"):
             if dept not in self.majors:
                 self.majors[dept] = Major(dept)
-            self.majors[dept].add_course(course, rore)
-    
-    def major_pt(self):
-        pt = PrettyTable(field_names=Major.fields())
-        for major in self.majors.values():
-            pt.add_row(major.details())
-        print(pt)   
+            self.majors[dept].add_course(course, r_or_e)
 
+    def remaining_courses(self):
+        for student in self.students.values():
+            student.req, student.elec = self.majors[student.major].get_req(student.courses)
+     
     def student_pt(self):
         print ('Student Summary')
-        pt = PrettyTable(field_names = Student.fields())
+        pt = PrettyTable(field_names=Student.fields())
         for student in self.students.values():
             pt.add_row(student.details())
         print(pt)
@@ -76,86 +71,86 @@ class Repository():
                 pt.add_row(i)
         print(pt)
 
-    def add_courses(self):
-        for student in self.students.values():
-            student.courses, student.r_e = self.majors[student.major].get_courses(student.courses)
+    def major_pt(self):
+        print("Major Summary")
+        pt = PrettyTable(field_names = Major.fields())
+        for major in self.majors.values():
+            pt.add_row(major.details())
+        print(pt)
 
 class Major:
-
     def __init__(self, major):
         self.major = major
-        self.courses = list()
-        self.r_e = list()
+        self.req = list()
+        self.elec = list()
 
-    def add_course(self, course, rore):
-        if rore == "R":
-            self.courses.append(course)
-        elif rore == "E":
-            self.r_e.append(course)
+    def add_course(self, course, r_or_e):
+        if r_or_e == "R":
+            self.req.append(course)
+        elif r_or_e == "E":
+            self.elec.append(course)
 
-    def get_courses(self, completed):
+    def get_req(self, courses_completed):
         result1 = []
         result2 = []
-        for course in self.courses:
-            if course not in completed:
-                result1.append(course) 
-        for elective in self.r_e:
-            if elective not in completed:
+        for course in self.req:
+            if course not in courses_completed:
+                result1.append(course)
+        
+        for elective in self.elec:
+            if elective not in courses_completed:
                 result2.append(elective)
             else:
-                result2 = None
-                break      
+                result2 = "-"
+                break  
         return (result1, result2)
 
-
-
     def details(self):
-        return [self.major, sorted(self.courses), sorted(self.r_e)]
+        return [self.major, sorted(self.req), sorted(self.elec)]
 
     @staticmethod
     def fields():
         return ["Dept", "Required", "Electives"]
 
 class Student:
-    
-    def __init__(self,s_cwid,s_name,major):
+
+    def __init__(self, s_cwid, s_name, major):
         self.s_cwid = s_cwid
         self.s_name = s_name
         self.major = major
-        self.course = dict()
-        self.courses = list()
-        self.r_e = list()
-    
-    def add_course(self,course,grade):
+        self.courses = dict()
+        self.req = []
+        self.elec = []
+
+    def add_course(self, course, grade):
         if grade in ['A', 'A-', 'B+', 'B', 'B-', 'C']:
             self.courses[course] = grade
 
     def details(self):
-        return [self.s_cwid, self.s_name, self.major, sorted(self.course.keys()), self.courses, self.r_e]
+        return [self.s_cwid, self.s_name, self.major, sorted(self.courses.keys()), self.req, self.elec]
 
     @staticmethod
     def fields():
-        return ["CWID", "Name", "Major", "Completed Courses", "Remaining Required", "Remaining Electives"]
+        return ["S_CWID", "S_name", "Major", "Completed Courses", "Remaining Required", "Remaining Electives"]
 
-    
 class Instructor:
 
-    def __init__(self,i_cwid,i_name,dept):
+    def __init__(self, i_cwid, i_name, dept):
         self.i_cwid = i_cwid
         self.i_name = i_name
         self.dept = dept
-        self.course = defaultdict(int)
-    
-    def add_course(self,course):
-        self.course[course] += 1
-    
+        self.courses = defaultdict(int) 
+
+    def add_course(self, course):
+        self.courses[course] += 1
+
     def details(self):
-        for course,Student in self.course.items():
-            yield[self.i_cwid,self.i_name,self.dept, course,Student]
+        for course, students in self.courses.items():
+            yield [self.i_cwid, self.i_name, self.dept, course, students]
 
     @staticmethod
     def fields():
-        return ["CWID", "Name", "Dept", "Course", "Students"]
+        return ["I_CWID", "I_name", "Dept", "Course", "Students"]
 
 class RepositoryTest(unittest.TestCase):
 
@@ -170,10 +165,13 @@ class RepositoryTest(unittest.TestCase):
 
         self.assertEqual(result1, result2)
 
-    
 def main():
+    unittest.main(exit=False, verbosity=2)
     ob = Repository("/Users/ruchabhatawadekar/Desktop/Stevens")
+    
 
 if __name__ == '__main__':
-    unittest.main(exit=False, verbosity=2)
     main()
+
+
+
