@@ -6,6 +6,7 @@ import unittest
 from collections import defaultdict
 from prettytable import PrettyTable
 import unittest
+import sqlite3
 
 def file_reader(path, num_fields, seperator=',', header=False):
     '''Read file'''
@@ -53,29 +54,29 @@ class Repository():
         for student in self.students.values():
             pt.add_row(student.details())
         print(pt)
-    '''
+    """
     def instructor_pt(self):
         print ('Instructor Summary')
         pt = PrettyTable(field_names = ['I_CWID', 'Name', 'Dept', 'Course', 'Students'])
         for instructor in self.instructors.values():
             for i in instructor.details():
                 pt.add_row(i)
-        print(pt)'''
-import sqlite3
+        print(pt)
+        """
 
-def instructor_pt(self):
-    print ('Instructor Summary')
-    pt = PrettyTable(field_names = ['I_CWID', 'Name', 'Dept', 'Course', 'Students'])
-    DB_FILE = '/Users/ruchabhatawadekar/Desktop/SSW  810 /Homework/HW11/810_startup.db'
-    db = sqlite3.connect(DB_FILE)
-    query = """SELECT i.CWID, i.Name, i.Dept, g.Course, COUNT (* ) AS number_of_students
-            FROM HW11_instructors i
-            JOIN HW11_grades g ON i.CWID=g.Instructor_CWID
-            GROUP BY g.Course ORDER BY i.CWID DESC;"""
-    for instructor in self.instructors.values():
+
+    def instructor_pt(self):
+        print ('Instructor Summary')
+        pt = PrettyTable(field_names = ['I_CWID', 'Name', 'Dept', 'Course', 'Students'])
+        DB_FILE = '/Users/ruchabhatawadekar/Desktop/SSW  810 /Homework/HW11/810_startup.db'
+        db = sqlite3.connect(DB_FILE)
+        query = """SELECT i.CWID, i.Name, i.Dept, g.Course, COUNT (* ) AS number_of_students
+                FROM HW11_instructors i
+                JOIN HW11_grades g ON i.CWID=g.Instructor_CWID
+                GROUP BY g.Course ORDER BY i.CWID DESC;"""
         for i in db.execute(query):
             pt.add_row(i)
-    print(pt)
+        print(pt)
 
 class Student:
     
