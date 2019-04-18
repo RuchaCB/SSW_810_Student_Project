@@ -1,5 +1,5 @@
 # SSW_810_Student_Project
-Extraction of data from .txt files and creating PrettyTable in Python
+
 import datetime
 import os
 import unittest
@@ -53,14 +53,29 @@ class Repository():
         for student in self.students.values():
             pt.add_row(student.details())
         print(pt)
-
+    '''
     def instructor_pt(self):
         print ('Instructor Summary')
         pt = PrettyTable(field_names = ['I_CWID', 'Name', 'Dept', 'Course', 'Students'])
         for instructor in self.instructors.values():
             for i in instructor.details():
                 pt.add_row(i)
-        print(pt)
+        print(pt)'''
+import sqlite3
+
+def instructor_pt(self):
+    print ('Instructor Summary')
+    pt = PrettyTable(field_names = ['I_CWID', 'Name', 'Dept', 'Course', 'Students'])
+    DB_FILE = '/Users/ruchabhatawadekar/Desktop/SSW  810 /Homework/HW11/810_startup.db'
+    db = sqlite3.connect(DB_FILE)
+    query = """SELECT i.CWID, i.Name, i.Dept, g.Course, COUNT (* ) AS number_of_students
+            FROM HW11_instructors i
+            JOIN HW11_grades g ON i.CWID=g.Instructor_CWID
+            GROUP BY g.Course ORDER BY i.CWID DESC;"""
+    for instructor in self.instructors.values():
+        for i in db.execute(query):
+            pt.add_row(i)
+    print(pt)
 
 class Student:
     
@@ -111,3 +126,4 @@ def main():
 if __name__ == '__main__':
     unittest.main(exit=False, verbosity=2)
     main()
+
